@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Planner</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="app-title">Life Planner</h1>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Usuário</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Sidebar -->
+            <nav class="sidebar" id="sidebar">
+                <ul class="nav-menu">
+                    <li class="nav-item active" data-page="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </li>
+                    <li class="nav-item" data-page="tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Tarefas</span>
+                    </li>
+                    <li class="nav-item" data-page="calendar">
+                        <i class="fas fa-calendar"></i>
+                        <span>Calendário</span>
+                    </li>
+                    <li class="nav-item" data-page="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Configurações</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="content">
+                <!-- Dashboard Page -->
+                <div class="page active" id="dashboard-page">
+                    <div class="page-header">
+                        <h2>Dashboard</h2>
+                        <p>Visão geral das suas atividades</p>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-tasks"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="total-tasks">0</h3>
+                                <p>Total de Tarefas</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="completed-tasks">0</h3>
+                                <p>Concluídas</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="pending-tasks">0</h3>
+                                <p>Pendentes</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-info">
+                                <h3 id="overdue-tasks">0</h3>
+                                <p>Atrasadas</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-tasks">
+                        <h3>Tarefas Recentes</h3>
+                        <div id="recent-tasks-list" class="task-list">
+                            <!-- Tarefas serão carregadas aqui -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks Page -->
+                <div class="page" id="tasks-page">
+                    <div class="page-header">
+                        <h2>Tarefas</h2>
+                        <button class="btn btn-primary" id="add-task-btn">
+                            <i class="fas fa-plus"></i>
+                            Nova Tarefa
+                        </button>
+                    </div>
+                    
+                    <div class="task-filters">
+                        <button class="filter-btn active" data-filter="all">Todas</button>
+                        <button class="filter-btn" data-filter="pending">Pendentes</button>
+                        <button class="filter-btn" data-filter="completed">Concluídas</button>
+                        <button class="filter-btn" data-filter="overdue">Atrasadas</button>
+                    </div>
+
+                    <div id="tasks-list" class="task-list">
+                        <!-- Tarefas serão carregadas aqui -->
+                    </div>
+                </div>
+
+                <!-- Calendar Page -->
+                <div class="page" id="calendar-page">
+                    <div class="page-header">
+                        <h2>Calendário</h2>
+                        <p>Visualize suas tarefas por data</p>
+                    </div>
+                    
+                    <div class="calendar-container">
+                        <div class="calendar-header">
+                            <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
+                            <h3 id="current-month">Janeiro 2024</h3>
+                            <button id="next-month"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        
+                        <div class="calendar-grid" id="calendar-grid">
+                            <!-- Calendário será gerado aqui -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div class="page" id="settings-page">
+                    <div class="page-header">
+                        <h2>Configurações</h2>
+                        <p>Personalize sua experiência</p>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Notificações</h3>
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" id="notifications-enabled" checked>
+                                Ativar notificações
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal para Nova Tarefa -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Nova Tarefa</h3>
+                <button class="modal-close" id="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="task-form">
+                <div class="form-group">
+                    <label for="task-title">Título:</label>
+                    <input type="text" id="task-title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-description">Descrição:</label>
+                    <textarea id="task-description" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-due-date">Data de Vencimento:</label>
+                    <input type="date" id="task-due-date" name="due_date">
+                    <small style="color: #888; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                        A data deve ser igual ou posterior ao dia atual
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="task-priority">Prioridade:</label>
+                    <select id="task-priority">
+                        <option value="low">Baixa</option>
+                        <option value="medium" selected>Média</option>
+                        <option value="high">Alta</option>
+                    </select>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

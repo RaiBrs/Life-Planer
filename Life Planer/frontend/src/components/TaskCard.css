@@ -1,0 +1,276 @@
+.task-card {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.task-card:hover {
+  border-color: var(--text-muted);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.task-card.concluida {
+  opacity: 0.7;
+  border-color: var(--success);
+}
+
+.task-card.overdue {
+  border-left: 4px solid var(--error);
+}
+
+.task-card.editing {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Header da Tarefa */
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.task-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-btn.pending {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.status-btn.progress {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.status-btn.success {
+  color: var(--success);
+  border-color: var(--success);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.status-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.status-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-label.pending {
+  color: var(--warning);
+}
+
+.status-label.progress {
+  color: var(--accent-blue);
+}
+
+.status-label.success {
+  color: var(--success);
+}
+
+/* Ações da Tarefa */
+.task-actions {
+  position: relative;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--hover-bg);
+}
+
+.actions-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.action-item:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.action-item.danger {
+  color: var(--error);
+}
+
+.action-item.danger:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Corpo da Tarefa */
+.task-body {
+  margin-bottom: 0.75rem;
+}
+
+.task-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.task-card.concluida .task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.task-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Footer da Tarefa */
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.task-due-date {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.task-due-date.overdue {
+  color: var(--error);
+}
+
+/* Formulário de Edição */
+.edit-form {
+  width: 100%;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+/* Responsividade */
+@media (max-width: 640px) {
+  .task-card {
+    padding: 0.75rem;
+  }
+  
+  .task-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .task-actions {
+    align-self: flex-end;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+}
+
+/* Animações */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actions-menu {
+  animation: slideIn 0.2s ease-out;
+}
+
+/* Estados de hover para melhor UX */
+.task-card:hover .task-title {
+  color: var(--accent-blue);
+}
+
+.task-card.concluida:hover .task-title {
+  color: var(--success);
+}
