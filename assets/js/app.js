@@ -14,20 +14,43 @@ class AppState {
         this.currentYear = new Date().getFullYear();
         this.editingTask = null;
         this.isLoading = false;
+        this.settings = {};
+        this.lastSyncTime = 0;
+        this.isDirty = false; // Flag para indicar se há mudanças não salvas
     }
 
     setState(newState) {
         Object.assign(this, newState);
-        this.saveToLocalStorage();
+        this.isDirty = true;
+        this.debouncedSave();
+    }
+
+    // Debounced save para evitar salvamentos excessivos
+    debouncedSave() {
+        if (this._saveTimeout) {
+            clearTimeout(this._saveTimeout);
+        }
+        this._saveTimeout = setTimeout(() => {
+            if (this.isDirty) {
+                this.saveToLocalStorage();
+                this.isDirty = false;
+            }
+        }, 500);
     }
 
     saveToLocalStorage() {
         try {
-            localStorage.setItem('lifeplannerState', JSON.stringify({
+            const stateToSave = {
                 tasks: this.tasks,
                 currentFilter: this.currentFilter,
-                sidebarOpen: this.sidebarOpen
-            }));
+                sidebarOpen: this.sidebarOpen,
+                currentPage: this.currentPage,
+                currentMonth: this.currentMonth,
+                currentYear: this.currentYear,
+                settings: this.settings,
+                lastSyncTime: Date.now()
+            };
+            localStorage.setItem('lifeplannerState', JSON.stringify(stateToSave));
         } catch (error) {
             console.warn('Failed to save state to localStorage:', error);
         }
@@ -41,10 +64,22 @@ class AppState {
                 this.tasks = state.tasks || [];
                 this.currentFilter = state.currentFilter || 'all';
                 this.sidebarOpen = state.sidebarOpen !== undefined ? state.sidebarOpen : this.sidebarOpen;
+                this.currentPage = state.currentPage || 'dashboard';
+                this.currentMonth = state.currentMonth !== undefined ? state.currentMonth : new Date().getMonth();
+                this.currentYear = state.currentYear || new Date().getFullYear();
+                this.settings = state.settings || {};
+                this.lastSyncTime = state.lastSyncTime || 0;
             }
         } catch (error) {
             console.warn('Failed to load state from localStorage:', error);
         }
+    }
+
+    // Método para invalidar cache quando necessário
+    invalidateCache() {
+        TaskManager.cachedTasks = null;
+        TaskManager.lastCacheTime = 0;
+        DOMManager.clearCache();
     }
 }
 
@@ -91,16 +126,44 @@ const Utils = {
 
 // DOM Management
 class DOMManager {
+    static elementCache = new Map();
+    static queryCache = new Map();
+    static CACHE_EXPIRY = 30000; // 30 segundos
+    
     static getElement(selector) {
+        // Cache mais agressivo para elementos que não mudam
+        const cacheKey = `single_${selector}`;
+        const cached = this.elementCache.get(cacheKey);
+        
+        if (cached && cached.timestamp > Date.now() - this.CACHE_EXPIRY) {
+            return cached.element;
+        }
+        
         const element = document.querySelector(selector);
-        if (!element) {
-            console.warn(`Element not found: ${selector}`);
+        if (element) {
+            this.elementCache.set(cacheKey, {
+                element,
+                timestamp: Date.now()
+            });
         }
         return element;
     }
 
     static getAllElements(selector) {
-        return document.querySelectorAll(selector);
+        // Cache para NodeLists
+        const cacheKey = `all_${selector}`;
+        const cached = this.queryCache.get(cacheKey);
+        
+        if (cached && cached.timestamp > Date.now() - this.CACHE_EXPIRY) {
+            return cached.elements;
+        }
+        
+        const elements = document.querySelectorAll(selector);
+        this.queryCache.set(cacheKey, {
+            elements,
+            timestamp: Date.now()
+        });
+        return elements;
     }
 
     static createElement(tag, className = '', content = '') {
@@ -122,6 +185,24 @@ class DOMManager {
         if (element) {
             element.style.display = element.style.display === 'none' ? 'block' : 'none';
         }
+    }
+
+    static clearCache() {
+        this.elementCache.clear();
+        this.queryCache.clear();
+    }
+
+    // Método otimizado para batch updates
+    static batchUpdate(updates) {
+        // Usar requestAnimationFrame para otimizar updates
+        requestAnimationFrame(() => {
+            updates.forEach(update => {
+                const { element, property, value } = update;
+                if (element && property) {
+                    element[property] = value;
+                }
+            });
+        });
     }
 }
 
@@ -226,56 +307,223 @@ class APIService {
 
 // Task Manager
 class TaskManager {
+    static cachedTasks = null;
+    static lastCacheTime = 0;
+    static CACHE_DURATION = 2000; // Reduzido para 2 segundos
+    static renderQueue = [];
+    static isRendering = false;
+
+    // Método para limpar cache quando necessário
+    static clearCache() {
+        this.cachedTasks = null;
+        this.lastCacheTime = 0;
+    }
+
     static getFilteredTasks() {
-        const { tasks, currentFilter } = appState;
+        // Cache mais eficiente para filtros
+        const cacheKey = `filtered_${appState.currentFilter}`;
+        const now = Date.now();
         
-        switch (currentFilter) {
-            case 'completed':
-                return tasks.filter(task => task.completed);
-            case 'pending':
-                return tasks.filter(task => !task.completed);
-            case 'high':
-                return tasks.filter(task => task.priority === 'high');
-            case 'medium':
-                return tasks.filter(task => task.priority === 'medium');
-            case 'low':
-                return tasks.filter(task => task.priority === 'low');
-            default:
-                return tasks;
+        if (this.cachedTasks && this.cachedTasks[cacheKey] && 
+            (now - this.lastCacheTime) < this.CACHE_DURATION) {
+            return this.cachedTasks[cacheKey];
         }
+
+        const filter = appState.currentFilter || 'all';
+        let tasks = appState.tasks || [];
+        let filtered;
+
+        switch (filter) {
+            case 'pending':
+                filtered = tasks.filter(task => !task.completed);
+                break;
+            case 'completed':
+                filtered = tasks.filter(task => task.completed);
+                break;
+            case 'high':
+                filtered = tasks.filter(task => task.priority === 'high');
+                break;
+            case 'medium':
+                filtered = tasks.filter(task => task.priority === 'medium');
+                break;
+            case 'low':
+                filtered = tasks.filter(task => task.priority === 'low');
+                break;
+            case 'overdue':
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                filtered = tasks.filter(task => 
+                    !task.completed && task.dueDate && new Date(task.dueDate) < today
+                );
+                break;
+            default:
+                filtered = tasks;
+        }
+
+        // Inicializar cache se não existir
+        if (!this.cachedTasks) {
+            this.cachedTasks = {};
+        }
+        
+        this.cachedTasks[cacheKey] = filtered;
+        this.lastCacheTime = now;
+        return filtered;
     }
 
     static renderTasks() {
-        const tasksList = DOMManager.getElement('.tasks-list');
-        if (!tasksList) return;
-
-        const filteredTasks = this.getFilteredTasks();
-        
-        if (filteredTasks.length === 0) {
-            tasksList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-tasks"></i>
-                    <h3>Nenhuma tarefa encontrada</h3>
-                    <p>Crie sua primeira tarefa para começar!</p>
-                </div>
-            `;
+        // Evitar renderizações simultâneas
+        if (this.isRendering) {
+            this.renderQueue.push('tasks');
             return;
         }
 
-        tasksList.innerHTML = filteredTasks.map(task => this.createTaskHTML(task)).join('');
+        this.isRendering = true;
+        
+        // Usar requestAnimationFrame para melhor performance
+        requestAnimationFrame(() => {
+            const tasksList = DOMManager.getElement('#tasks-list');
+            if (!tasksList) {
+                this.isRendering = false;
+                return;
+            }
+
+            const filteredTasks = this.getFilteredTasks();
+            
+            if (filteredTasks.length === 0) {
+                tasksList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-tasks"></i>
+                        <h3>Nenhuma tarefa encontrada</h3>
+                        <p>Crie sua primeira tarefa para começar!</p>
+                    </div>
+                `;
+                this.isRendering = false;
+                this.processQueue();
+                return;
+            }
+
+            // Usar DocumentFragment para melhor performance
+            const fragment = document.createDocumentFragment();
+            
+            // Renderizar em lotes para não bloquear a UI
+            const batchSize = 10;
+            let index = 0;
+            
+            const renderBatch = () => {
+                const endIndex = Math.min(index + batchSize, filteredTasks.length);
+                
+                for (let i = index; i < endIndex; i++) {
+                    const taskElement = this.createTaskElement(filteredTasks[i]);
+                    fragment.appendChild(taskElement);
+                }
+                
+                index = endIndex;
+                
+                if (index < filteredTasks.length) {
+                    // Continuar no próximo frame
+                    requestAnimationFrame(renderBatch);
+                } else {
+                    // Finalizar renderização
+                    tasksList.innerHTML = '';
+                    tasksList.appendChild(fragment);
+                    this.isRendering = false;
+                    this.processQueue();
+                }
+            };
+            
+            renderBatch();
+        });
+    }
+
+    static processQueue() {
+        if (this.renderQueue.length > 0) {
+            const next = this.renderQueue.shift();
+            if (next === 'tasks') {
+                this.renderTasks();
+            } else if (next === 'recent') {
+                this.renderRecentTasks();
+            }
+        }
     }
 
     static renderRecentTasks() {
+        if (this.isRendering) {
+            this.renderQueue.push('recent');
+            return;
+        }
+
         const recentTasksList = DOMManager.getElement('.recent-tasks');
         if (!recentTasksList) return;
+
+        // Cache mais específico para tarefas recentes
+        const now = Date.now();
+        const cacheKey = 'recent_tasks';
+        
+        if (this.cachedTasks && this.cachedTasks[cacheKey] && 
+            (now - this.lastCacheTime) < this.CACHE_DURATION) {
+            return;
+        }
 
         const recentTasks = appState.tasks
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 5);
 
-        recentTasksList.innerHTML = recentTasks.map(task => 
-            this.createTaskHTML(task, true)
-        ).join('');
+        const fragment = document.createDocumentFragment();
+        recentTasks.forEach(task => {
+            const taskElement = this.createTaskElement(task, true);
+            fragment.appendChild(taskElement);
+        });
+
+        recentTasksList.innerHTML = '';
+        recentTasksList.appendChild(fragment);
+        
+        if (!this.cachedTasks) {
+            this.cachedTasks = {};
+        }
+        this.cachedTasks[cacheKey] = recentTasks;
+        this.lastCacheTime = now;
+    }
+
+    static createTaskElement(task, isRecent = false) {
+        const taskDiv = document.createElement('div');
+        taskDiv.className = `task-card ${task.completed ? 'completed' : ''}`;
+        taskDiv.dataset.taskId = task.id;
+        
+        const priorityClass = `priority-${task.priority}`;
+        
+        taskDiv.innerHTML = `
+            <div class="task-header">
+                <div>
+                    <h3 class="task-title">${Utils.sanitizeInput(task.title)}</h3>
+                    <span class="task-priority ${priorityClass}">
+                        ${this.getPriorityText(task.priority)}
+                    </span>
+                </div>
+                <div class="task-actions">
+                    <button class="task-action complete" data-task-id="${task.id}" data-action="toggle"
+                            title="${task.completed ? 'Marcar como pendente' : 'Marcar como concluída'}">
+                        <i class="fas fa-${task.completed ? 'undo' : 'check'}"></i>
+                    </button>
+                    ${!isRecent ? `
+                        <button class="task-action edit" data-task-id="${task.id}" data-action="edit" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="task-action delete" data-task-id="${task.id}" data-action="delete" title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            ${task.description ? `<p class="task-description">${Utils.sanitizeInput(task.description)}</p>` : ''}
+            <div class="task-meta">
+                <span class="task-date">
+                    <i class="fas fa-calendar"></i>
+                    ${task.dueDate ? Utils.formatDate(task.dueDate) : 'Sem prazo'}
+                </span>
+            </div>
+        `;
+        
+        return taskDiv;
     }
 
     static createTaskHTML(task, isRecent = false) {
@@ -364,14 +612,25 @@ class TaskManager {
     }
 
     static setFilter(filter) {
+        // Limpar cache quando filtro muda
+        TaskManager.cachedTasks = null;
+        
         appState.setState({ currentFilter: filter });
         
-        // Update filter buttons
+        // Atualizar UI do filtro ativo
         DOMManager.getAllElements('.filter-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.filter === filter);
+            btn.classList.remove('active');
         });
         
-        this.renderTasks();
+        const activeBtn = DOMManager.getElement(`[data-filter="${filter}"]`);
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+        
+        // Usar requestAnimationFrame para renderização suave
+        requestAnimationFrame(() => {
+            this.renderTasks();
+        });
     }
 }
 
@@ -421,6 +680,8 @@ class ModalManager {
             dueDate: formData.get('dueDate')
         };
 
+        console.log('Form data captured:', taskData); // Debug log
+
         // Validation
         if (!taskData.title) {
             NotificationManager.show('Título é obrigatório', 'error');
@@ -432,16 +693,18 @@ class ModalManager {
                 await APIService.updateTask(appState.editingTask.id, taskData);
                 NotificationManager.show('Tarefa atualizada com sucesso', 'success');
             } else {
-                await APIService.createTask(taskData);
+                const newTask = await APIService.createTask(taskData);
+                console.log('Task created successfully:', newTask); // Debug log
                 NotificationManager.show('Tarefa criada com sucesso', 'success');
             }
 
             TaskManager.renderTasks();
             TaskManager.renderRecentTasks();
             StatsManager.updateStats();
-            this.closeTaskModal();
+            ModalManager.closeTaskModal();
         } catch (error) {
-            NotificationManager.show('Erro ao salvar tarefa', 'error');
+            console.error('Error saving task:', error); // Better error logging
+            NotificationManager.show('Erro ao salvar tarefa: ' + error.message, 'error');
         }
     }
 }
@@ -536,7 +799,7 @@ class NavigationManager {
 class CalendarManager {
     static renderCalendar() {
         const calendarGrid = DOMManager.getElement('.calendar-grid');
-        const monthYear = DOMManager.getElement('#current-month-year');
+        const monthYear = DOMManager.getElement('#current-month');
         
         if (!calendarGrid) return;
 
@@ -689,99 +952,207 @@ class NotificationManager {
     }
 }
 
-// Event Listeners Setup
-function setupEventListeners() {
-    // Menu toggle
-    const menuToggle = DOMManager.getElement('#menuToggle');
-    if (menuToggle) {
-        menuToggle.addEventListener('click', NavigationManager.toggleSidebar);
-    }
-
-    // Navigation
-    DOMManager.getAllElements('.nav-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const page = this.dataset.page;
-            NavigationManager.showPage(page);
-            NavigationManager.setActiveNavItem(this);
-        });
-    });
-
-    // Add task button
-    const addTaskBtn = DOMManager.getElement('#add-task-btn');
-    if (addTaskBtn) {
-        addTaskBtn.addEventListener('click', () => ModalManager.openTaskModal());
-    }
-
-    // Task filters
-    DOMManager.getAllElements('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            TaskManager.setFilter(this.dataset.filter);
-        });
-    });
-
-    // Modal close buttons
-    DOMManager.getAllElements('.close-btn, #cancel-btn').forEach(btn => {
-        btn.addEventListener('click', ModalManager.closeTaskModal);
-    });
-
-    // Task form submission
-    const taskForm = DOMManager.getElement('#task-form');
-    if (taskForm) {
-        taskForm.addEventListener('submit', ModalManager.handleTaskSubmit);
-    }
-
-    // Calendar navigation
-    const prevMonthBtn = DOMManager.getElement('#prev-month');
-    const nextMonthBtn = DOMManager.getElement('#next-month');
+// Event Listeners Setup with Performance Optimizations
+class EventManager {
+    // Debounced functions para evitar execuções excessivas
+    static debounceTimers = new Map();
     
-    if (prevMonthBtn) {
-        prevMonthBtn.addEventListener('click', () => CalendarManager.changeMonth(-1));
-    }
-    if (nextMonthBtn) {
-        nextMonthBtn.addEventListener('click', () => CalendarManager.changeMonth(1));
-    }
-
-    // Settings toggles
-    DOMManager.getAllElements('.toggle-switch').forEach(toggle => {
-        toggle.addEventListener('click', SettingsManager.handleToggle);
-    });
-
-    // Modal backdrop click
-    const modal = DOMManager.getElement('#task-modal');
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                ModalManager.closeTaskModal();
-            }
-        });
-    }
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-        // ESC to close modal
-        if (e.key === 'Escape') {
-            ModalManager.closeTaskModal();
+    static debounce(func, delay, key) {
+        if (this.debounceTimers.has(key)) {
+            clearTimeout(this.debounceTimers.get(key));
         }
         
-        // Ctrl+N to add new task
-        if (e.ctrlKey && e.key === 'n') {
-            e.preventDefault();
-            ModalManager.openTaskModal();
-        }
-    });
+        const timer = setTimeout(() => {
+            func();
+            this.debounceTimers.delete(key);
+        }, delay);
+        
+        this.debounceTimers.set(key, timer);
+    }
 
-    // Responsive sidebar
-    window.addEventListener('resize', Utils.debounce(() => {
-        if (window.innerWidth <= 768) {
-            const sidebar = DOMManager.getElement('.sidebar');
-            const content = DOMManager.getElement('.content');
-            
-            if (sidebar && content) {
-                sidebar.classList.add('collapsed');
-                content.classList.add('sidebar-collapsed');
-            }
+    static setupEventListeners() {
+        // Menu toggle - com debounce
+        const menuToggle = DOMManager.getElement('#menuToggle');
+        if (menuToggle) {
+            menuToggle.addEventListener('click', () => {
+                this.debounce(() => {
+                    NavigationManager.toggleSidebar();
+                }, 100, 'menu-toggle');
+            });
         }
-    }, 250));
+
+        // Navigation - com debounce
+        DOMManager.getAllElements('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const page = this.dataset.page;
+                EventManager.debounce(() => {
+                    NavigationManager.showPage(page);
+                    NavigationManager.setActiveNavItem(this);
+                }, 150, `nav-${page}`);
+            });
+        });
+
+        // Add task button - com debounce
+        const addTaskBtn = DOMManager.getElement('#add-task-btn');
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', () => {
+                this.debounce(() => {
+                    ModalManager.openTaskModal();
+                }, 200, 'add-task');
+            });
+        }
+
+        // Task filters - com debounce mais agressivo
+        DOMManager.getAllElements('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const filter = this.dataset.filter;
+                EventManager.debounce(() => {
+                    TaskManager.setFilter(filter);
+                }, 250, 'filter-change');
+            });
+        });
+
+        // Modal close buttons - com debounce
+        DOMManager.getAllElements('.close-btn, #cancel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.debounce(() => {
+                    ModalManager.closeTaskModal();
+                }, 100, 'close-modal');
+            });
+        });
+
+        // Task form submission - com debounce
+        const taskForm = DOMManager.getElement('#task-form');
+        if (taskForm) {
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.debounce(() => {
+                    ModalManager.handleTaskSubmit(e);
+                }, 300, 'save-task');
+            });
+        }
+
+        // Calendar navigation - com debounce
+        const prevMonthBtn = DOMManager.getElement('#prev-month');
+        const nextMonthBtn = DOMManager.getElement('#next-month');
+        
+        if (prevMonthBtn) {
+            prevMonthBtn.addEventListener('click', () => {
+                this.debounce(() => {
+                    CalendarManager.changeMonth(-1);
+                }, 200, 'prev-month');
+            });
+        }
+        if (nextMonthBtn) {
+            nextMonthBtn.addEventListener('click', () => {
+                this.debounce(() => {
+                    CalendarManager.changeMonth(1);
+                }, 200, 'next-month');
+            });
+        }
+
+        // Settings toggles - com debounce
+        DOMManager.getAllElements('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                this.debounce(() => {
+                    SettingsManager.handleToggle(e);
+                }, 200, 'settings-toggle');
+            });
+        });
+
+        // Modal backdrop click - sem debounce para responsividade
+        const modal = DOMManager.getElement('#task-modal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    ModalManager.closeTaskModal();
+                }
+            });
+        }
+
+        // Event delegation para ações de tarefas - otimizado com debounce
+        const tasksContainer = DOMManager.getElement('#tasks-list');
+        if (tasksContainer) {
+            tasksContainer.addEventListener('click', function(e) {
+                const button = e.target.closest('.task-action');
+                if (!button) return;
+                
+                const taskId = button.dataset.taskId;
+                const action = button.dataset.action;
+                
+                // Usar debounce para ações de tarefa
+                switch (action) {
+                    case 'toggle':
+                        EventManager.debounce(() => {
+                            TaskManager.toggleComplete(taskId);
+                        }, 150, `toggle-${taskId}`);
+                        break;
+                    case 'edit':
+                        EventManager.debounce(() => {
+                            TaskManager.editTask(taskId);
+                        }, 150, `edit-${taskId}`);
+                        break;
+                    case 'delete':
+                        EventManager.debounce(() => {
+                            TaskManager.confirmDelete(taskId);
+                        }, 150, `delete-${taskId}`);
+                        break;
+                }
+            });
+        }
+
+        // Event delegation para tarefas recentes - com debounce
+        const recentTasksContainer = DOMManager.getElement('.recent-tasks');
+        if (recentTasksContainer) {
+            recentTasksContainer.addEventListener('click', function(e) {
+                const button = e.target.closest('.task-action');
+                if (!button) return;
+                
+                const taskId = button.dataset.taskId;
+                const action = button.dataset.action;
+                
+                if (action === 'toggle') {
+                    EventManager.debounce(() => {
+                        TaskManager.toggleComplete(taskId);
+                    }, 150, `recent-toggle-${taskId}`);
+                }
+            });
+        }
+
+        // Keyboard shortcuts - sem debounce para responsividade
+        document.addEventListener('keydown', function(e) {
+            // ESC to close modal
+            if (e.key === 'Escape') {
+                ModalManager.closeTaskModal();
+            }
+            
+            // Ctrl+N to add new task
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                ModalManager.openTaskModal();
+            }
+        });
+
+        // Responsive sidebar com debounce otimizado
+        const debouncedResize = Utils.debounce(() => {
+            if (window.innerWidth <= 768) {
+                const sidebar = DOMManager.getElement('.sidebar');
+                const content = DOMManager.getElement('.content');
+                
+                if (sidebar && content) {
+                    sidebar.classList.add('collapsed');
+                    content.classList.add('sidebar-collapsed');
+                }
+            }
+        }, 100); // Reduzido para 100ms para melhor responsividade
+        
+        window.addEventListener('resize', debouncedResize);
+    }
+}
+
+// Função de compatibilidade
+function setupEventListeners() {
+    EventManager.setupEventListeners();
 }
 
 // Application Initialization

@@ -181,17 +181,17 @@
             <form id="task-form">
                 <div class="form-group">
                     <label for="task-title">Título:</label>
-                    <input type="text" id="task-title" required>
+                    <input type="text" id="task-title" name="title" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="task-description">Descrição:</label>
-                    <textarea id="task-description" rows="3"></textarea>
+                    <textarea id="task-description" name="description" rows="3"></textarea>
                 </div>
                 
                 <div class="form-group">
                     <label for="task-due-date">Data de Vencimento:</label>
-                    <input type="date" id="task-due-date" name="due_date">
+                    <input type="date" id="task-due-date" name="dueDate">
                     <small style="color: #888; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
                         A data deve ser igual ou posterior ao dia atual
                     </small>
@@ -199,7 +199,7 @@
                 
                 <div class="form-group">
                     <label for="task-priority">Prioridade:</label>
-                    <select id="task-priority">
+                    <select id="task-priority" name="priority">
                         <option value="low">Baixa</option>
                         <option value="medium" selected>Média</option>
                         <option value="high">Alta</option>
