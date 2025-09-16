@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Life Planner</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <meta name="description" content="Life Planner - Organize suas tarefas e gerencie sua vida de forma eficiente">
+    <meta name="keywords" content="planner, tarefas, organização, produtividade">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 </head>
 <body>
     <div class="app">
@@ -52,57 +58,49 @@
             <main class="content">
                 <!-- Dashboard Page -->
                 <div class="page active" id="dashboard-page">
-                    <div class="page-header">
-                        <h2>Dashboard</h2>
-                        <p>Visão geral das suas atividades</p>
+                    <div class="dashboard-header">
+                        <h2 class="dashboard-title">Dashboard</h2>
+                        <p class="dashboard-subtitle">Visão geral das suas atividades</p>
                     </div>
                     
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-tasks"></i>
+                            <div class="stat-header">
+                                <span class="stat-title">Total de Tarefas</span>
+                                <i class="stat-icon fas fa-tasks"></i>
                             </div>
-                            <div class="stat-info">
-                                <h3 id="total-tasks">0</h3>
-                                <p>Total de Tarefas</p>
-                            </div>
+                            <div class="stat-value" id="total-tasks">0</div>
                         </div>
                         
                         <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-check-circle"></i>
+                            <div class="stat-header">
+                                <span class="stat-title">Concluídas</span>
+                                <i class="stat-icon fas fa-check-circle"></i>
                             </div>
-                            <div class="stat-info">
-                                <h3 id="completed-tasks">0</h3>
-                                <p>Concluídas</p>
-                            </div>
+                            <div class="stat-value" id="completed-tasks">0</div>
                         </div>
                         
                         <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-clock"></i>
+                            <div class="stat-header">
+                                <span class="stat-title">Pendentes</span>
+                                <i class="stat-icon fas fa-clock"></i>
                             </div>
-                            <div class="stat-info">
-                                <h3 id="pending-tasks">0</h3>
-                                <p>Pendentes</p>
-                            </div>
+                            <div class="stat-value" id="pending-tasks">0</div>
                         </div>
                         
                         <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-exclamation-triangle"></i>
+                            <div class="stat-header">
+                                <span class="stat-title">Alta Prioridade</span>
+                                <i class="stat-icon fas fa-exclamation-triangle"></i>
                             </div>
-                            <div class="stat-info">
-                                <h3 id="overdue-tasks">0</h3>
-                                <p>Atrasadas</p>
-                            </div>
+                            <div class="stat-value" id="high-priority-tasks">0</div>
                         </div>
                     </div>
 
-                    <div class="recent-tasks">
+                    <div class="dashboard-section">
                         <h3>Tarefas Recentes</h3>
-                        <div id="recent-tasks-list" class="task-list">
-                            <!-- Tarefas serão carregadas aqui -->
+                        <div class="recent-tasks" id="recent-tasks">
+                            <!-- Recent tasks will be populated by JavaScript -->
                         </div>
                     </div>
                 </div>
@@ -216,6 +214,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="assets/js/app.js"></script>
 </body>
 </html>
